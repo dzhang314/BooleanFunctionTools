@@ -43,6 +43,10 @@ CertificateQ::usage = "TODO";
 Certificates::usage = "TODO";
 CertificateComplexity::usage = "TODO";
 
+SensitiveBitQ::usage = "TODO";
+SensitiveBits::usage = "TODO";
+Sensitivity::usage = "TODO";
+
 SensitiveBlockQ::usage = "TODO";
 SensitiveBlocks::usage = "TODO";
 MinimalSensitiveBlocks::usage = "TODO";
@@ -68,6 +72,18 @@ CertificateComplexity[f_, x_List] := Min[Length /@ Certificates[f, x]];
 CertificateComplexity[f_, n_Integer] := Max[
     CertificateComplexity[f, #]& /@ Tuples[{0, 1}, n]
 ];
+
+(* ============================================================== SENSITIVITY *)
+
+FlipBit[x_List, i_Integer] := MapAt[1 - #&, x, i];
+
+SensitiveBitQ[f_, x_List, i_Integer] := (f @@ x) =!= (f @@ FlipBit[x, i]);
+
+SensitiveBits[f_, x_List] := Select[Range@Length[x], SensitiveBitQ[f, x, #]&];
+
+Sensitivity[f_, x_List] := Length@SensitiveBits[f, x];
+
+Sensitivity[f_, n_Integer] := Max[Sensitivity[f, #]& /@ Tuples[{0, 1}, n]];
 
 (* ======================================================== BLOCK SENSITIVITY *)
 
@@ -100,8 +116,11 @@ DisjointSubsets[xs_List] := With[
 MaximalSensitiveBlockFamilies[f_, x_List] :=
     MaximalBy[DisjointSubsets@MinimalSensitiveBlocks[f, x], Length];
 
+BlockSensitivity[f_, x_List] :=
+    Max[Length /@ DisjointSubsets@MinimalSensitiveBlocks[f, x]];
+
 BlockSensitivity[f_, n_Integer] := Max@Map[
-    Max[Length /@ DisjointSubsets@MinimalSensitiveBlocks[f, #]]&,
+    BlockSensitivity[f, #]&,
     Tuples[{0, 1}, n]
 ];
 
