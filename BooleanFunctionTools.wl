@@ -53,6 +53,10 @@ MinimalSensitiveBlocks::usage = "TODO";
 MaximalSensitiveBlockFamilies::usage = "TODO";
 BlockSensitivity::usage = "TODO";
 
+BinaryDecisionTrees::usage = "TODO";
+EvaluateTree::usage = "TODO";
+BooleanFunctionIndex::usage = "TODO";
+
 Begin["`Private`"];
 
 (* =================================================== CERTIFICATE COMPLEXITY *)
@@ -105,6 +109,7 @@ MinimalSensitiveBlocks[f_, x_List] := With[
 ];
 
 DisjointSubsets[{}] = {{}};
+
 DisjointSubsets[xs_List] := With[
     {x = First[xs], r = Rest[xs]},
     Union[
@@ -124,8 +129,39 @@ BlockSensitivity[f_, n_Integer] := Max@Map[
     Tuples[{0, 1}, n]
 ];
 
+(* ================================================= DECISION TREE COMPLEXITY *)
+
+BinaryDecisionTrees[vars_List, 0] := {0, 1};
+
+BinaryDecisionTrees[vars_List, depth_Integer] :=
+BinaryDecisionTrees[vars, depth] = Union[
+    Flatten@Table[
+        {vars[[i]][a, b], vars[[i]][b, a]},
+        {i, Length[vars]},
+        {n, 0, depth - 2},
+        {a, BinaryDecisionTrees[Delete[vars, i], depth - 1]},
+        {b, BinaryDecisionTrees[Delete[vars, i], n]}
+    ],
+    Flatten@Table[
+        If[a === b, Nothing, vars[[i]][a, b]],
+        {i, Length[vars]},
+        {a, BinaryDecisionTrees[Delete[vars, i], depth - 1]},
+        {b, BinaryDecisionTrees[Delete[vars, i], depth - 1]}
+    ]
+];
+
+EvaluateTree[0, _] = 0;
+
+EvaluateTree[1, _] = 1;
+
+EvaluateTree[i_[a_, b_], x_List] :=
+    If[x[[i]] === 0, EvaluateTree[a, x], EvaluateTree[b, x]];
+
+BooleanFunctionIndex[tree_, n_Integer] :=
+    FromDigits[Reverse[EvaluateTree[tree, #]& /@ Tuples[{0, 1}, n]], 2];
+
 (* ========================================================================== *)
 
 End[]; (* `Private` *)
-Protect["BooleanFunctionTools`*"];
+(* Protect["BooleanFunctionTools`*"]; *)
 EndPackage[]; (* BooleanFunctionTools` *)
