@@ -34,6 +34,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE. *)
 
 BeginPackage["BooleanFunctionTools`"];
+Needs["Developer`"];
 
 Unprotect["BooleanFunctionTools`*"];
 ClearAll["BooleanFunctionTools`*"];
@@ -54,8 +55,20 @@ MaximalSensitiveBlockFamilies::usage = "TODO";
 BlockSensitivity::usage = "TODO";
 
 BinaryDecisionTrees::usage = "TODO";
+TreeDepth::usage = "TODO";
 EvaluateTree::usage = "TODO";
 BooleanFunctionIndex::usage = "TODO";
+
+BooleanFourierTransformMatrix::usage = "TODO";
+BooleanFourierCoefficients::usage = "TODO";
+FourierDegree::usage = "TODO";
+
+ApproximatingPolynomial::usage = "TODO";
+NApproximatingPolynomial::usage = "TODO";
+ApproximationSpectrum::usage = "TODO";
+NApproximationSpectrum::usage = "TODO";
+ExactDegree::usage = "TODO";
+ApproximateDegree::usage = "TODO";
 
 Begin["`Private`"];
 
@@ -150,6 +163,12 @@ BinaryDecisionTrees[vars, depth] = Union[
     ]
 ];
 
+TreeDepth[0] = 0;
+
+TreeDepth[1] = 0;
+
+TreeDepth[_[a_, b_]] := 1 + Max[TreeDepth[a], TreeDepth[b]];
+
 EvaluateTree[0, _] = 0;
 
 EvaluateTree[1, _] = 1;
@@ -159,6 +178,102 @@ EvaluateTree[i_[a_, b_], x_List] :=
 
 BooleanFunctionIndex[tree_, n_Integer] :=
     FromDigits[Reverse[EvaluateTree[tree, #]& /@ Tuples[{0, 1}, n]], 2];
+
+(* ========================================================= FOURIER ANALYSIS *)
+
+BooleanParityMatrix[n_Integer, k_Integer] :=
+BooleanParityMatrix[n, k] = ToPackedArray@Outer[
+    Times @@ #1[[#2]]&,
+    Tuples[{+1, -1}, n],
+    Subsets[Range[n], k],
+    1
+];
+
+BooleanFourierTransformMatrix[n_Integer] :=
+BooleanFourierTransformMatrix[n] =
+    Transpose@BooleanParityMatrix[n, n] / 2^n;
+
+SignedTruthTable[f_Integer, n_Integer] :=
+    1 - 2 * Reverse@IntegerDigits[f, 2, 2^n];
+
+BooleanFourierCoefficients[f_Integer, n_Integer] := With[
+    {c = BooleanFourierTransformMatrix[n]. SignedTruthTable[f, n]},
+    MapThread[c[[#1 ;; #2]]&, {
+        1 + Accumulate@Binomial[n, Range[0, n] - 1],
+        Accumulate@Binomial[n, Range[0, n]]
+    }]
+];
+
+FourierDegree[f_Integer, n_Integer] := With[
+    {c = BooleanFourierCoefficients[f, n]},
+    n - LengthWhile[Reverse[AllTrue[# === 0&] /@ c], Identity]
+];
+
+(* ===================================================== (APPROXIMATE) DEGREE *)
+
+BooleanAndMatrix[n_Integer, k_Integer] :=
+BooleanAndMatrix[n, k] = ToPackedArray@Outer[
+    Times @@ #1[[#2]]&,
+    Tuples[{0, 1}, n],
+    Subsets[Range[n], k],
+    1
+];
+
+BinomialSum[n_, k_] :=
+BinomialSum[n, k] = Total@Binomial[n, Range[0, k]];
+
+ObjectiveVector[n_Integer, k_Integer] :=
+ObjectiveVector[n, k] = Prepend[ConstantArray[0, BinomialSum[n, k]], 1];
+
+NObjectiveVector[n_Integer, k_Integer] :=
+NObjectiveVector[n, k] = N@ObjectiveVector[n, k];
+
+ConstraintMatrix[n_Integer, k_Integer] :=
+ConstraintMatrix[n, k] = Join[
+    ConstantArray[1, {2^(n + 1), 1}],
+    Join[BooleanAndMatrix[n, k], -BooleanAndMatrix[n, k]],
+    2
+];
+
+NConstraintMatrix[n_Integer, k_Integer] :=
+NConstraintMatrix[n, k] =  N@ConstraintMatrix[n, k];
+
+BoundsVector[n_Integer, k_Integer] :=
+BoundsVector[n, k] = ConstantArray[-Infinity, BinomialSum[n, k] + 1];
+
+ApproximatingPolynomial[f_Integer, n_Integer, d_Integer] := With[
+    {truthTable = Reverse@IntegerDigits[f, 2, 2^n]},
+    Through@{First, Rest}@LinearProgramming[
+        ObjectiveVector[n, d],
+        ConstraintMatrix[n, d],
+        Join[truthTable, -truthTable],
+        BoundsVector[n, d]
+    ]
+];
+
+NApproximatingPolynomial[f_Integer, n_Integer, d_Integer] := With[
+    {truthTable = N@Reverse@IntegerDigits[f, 2, 2^n]},
+    Through@{First, Rest}@LinearProgramming[
+        NObjectiveVector[n, d],
+        NConstraintMatrix[n, d],
+        Join[truthTable, -truthTable],
+        BoundsVector[n, d]
+    ]
+];
+
+ApproximationSpectrum[f_Integer, n_Integer] :=
+    First@ApproximatingPolynomial[f, n, #]& /@ Range[0, n];
+
+NApproximationSpectrum[f_Integer, n_Integer] :=
+    First@NApproximatingPolynomial[f, n, #]& /@ Range[0, n];
+
+ExactDegree[f_Integer, n_Integer] :=
+    (n + 1) - LengthWhile[Reverse@ApproximationSpectrum[f, n], # === 0&];
+
+ApproximateDegree[f_Integer, n_Integer, epsilon_] :=
+    (n + 1) - LengthWhile[Reverse@ApproximationSpectrum[f, n], # <= epsilon&];
+
+ApproximateDegree[f_Integer, n_Integer] := ApproximateDegree[f, n, 1/3];
 
 (* ========================================================================== *)
 
