@@ -35,6 +35,15 @@ SOFTWARE. *)
 
 BeginPackage["BooleanFunctionTools`"];
 
+Unprotect["BooleanFunctionTools`*"];
+ClearAll["BooleanFunctionTools`*"];
+ClearAll["BooleanFunctionTools`Private`*"];
+
+CertificateQ::usage = "TODO";
+Certificates::usage = "TODO";
+CertificateComplexity::usage = "TODO";
+
+SensitiveBlockQ::usage = "TODO";
 SensitiveBlocks::usage = "TODO";
 MinimalSensitiveBlocks::usage = "TODO";
 MaximalSensitiveBlockFamilies::usage = "TODO";
@@ -42,41 +51,62 @@ BlockSensitivity::usage = "TODO";
 
 Begin["`Private`"];
 
+(* =================================================== CERTIFICATE COMPLEXITY *)
+
+CertificateQ[f_, x_List, s_List] := AllTrue[
+    Tuples[{0, 1}, Length[x]],
+    Implies[x[[s]] === #[[s]], f @@ x === f @@ #]&
+];
+
+Certificates[f_, x_List] := Select[
+    Subsets@Range@Length[x],
+    CertificateQ[f, x, #]&
+];
+
+CertificateComplexity[f_, x_List] := Min[Length /@ Certificates[f, x]];
+
+CertificateComplexity[f_, n_Integer] := Max[
+    CertificateComplexity[f, #]& /@ Tuples[{0, 1}, n]
+];
+
 (* ======================================================== BLOCK SENSITIVITY *)
 
 FlipBlock[x_List, s_List] := MapAt[1 - #&, x, List /@ s];
 
+SensitiveBlockQ[f_, x_List, s_List] := (f @@ x) =!= (f @@ FlipBlock[x, s]);
+
 SensitiveBlocks[f_, x_List] := Select[
-	Subsets@Range@Length[x],
-	(f @@ x) =!= (f @@ FlipBlock[x, #])&
+    Subsets@Range@Length[x],
+    SensitiveBlockQ[f, x, #]&
 ];
 
 ProperSubsetQ[xs_List][ys_List] :=
-	(Length[ys] < Length[xs]) && SubsetQ[xs, ys];
+    (Length[ys] < Length[xs]) && SubsetQ[xs, ys];
 
 MinimalSensitiveBlocks[f_, x_List] := With[
-	{blocks = SensitiveBlocks[f, x]},
-	Select[blocks, NoneTrue[blocks, ProperSubsetQ[#]]&]
+    {blocks = SensitiveBlocks[f, x]},
+    Select[blocks, NoneTrue[blocks, ProperSubsetQ[#]]&]
 ];
 
 DisjointSubsets[{}] = {{}};
 DisjointSubsets[xs_List] := With[
-	{x = First[xs], r = Rest[xs]},
-	Union[
-		Prepend[x] /@ DisjointSubsets@Select[r, DisjointQ[x, #]&],
-		DisjointSubsets[r]
-	]
+    {x = First[xs], r = Rest[xs]},
+    Union[
+        Prepend[x] /@ DisjointSubsets@Select[r, DisjointQ[x, #]&],
+        DisjointSubsets[r]
+    ]
 ];
 
 MaximalSensitiveBlockFamilies[f_, x_List] :=
-	MaximalBy[DisjointSubsets@MinimalSensitiveBlocks[f, x], Length];
+    MaximalBy[DisjointSubsets@MinimalSensitiveBlocks[f, x], Length];
 
 BlockSensitivity[f_, n_Integer] := Max@Map[
-	Max[Length /@ DisjointSubsets@MinimalSensitiveBlocks[f, #]]&,
-	Tuples[{0, 1}, n]
+    Max[Length /@ DisjointSubsets@MinimalSensitiveBlocks[f, #]]&,
+    Tuples[{0, 1}, n]
 ];
 
 (* ========================================================================== *)
 
 End[]; (* `Private` *)
+Protect["BooleanFunctionTools`*"];
 EndPackage[]; (* BooleanFunctionTools` *)
