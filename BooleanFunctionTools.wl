@@ -146,6 +146,9 @@ BlockSensitivity[f_, n_Integer] := Max@Map[
 
 BinaryDecisionTrees[vars_List, 0] := {0, 1};
 
+BinaryDecisionTrees[vars_List, 1] :=
+    Riffle[#[0, 1]& /@ vars, #[1, 0]& /@ vars];
+
 BinaryDecisionTrees[vars_List, depth_Integer] :=
 BinaryDecisionTrees[vars, depth] = Union[
     Flatten@Table[
